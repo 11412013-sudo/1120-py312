@@ -1,0 +1,126 @@
+"""依照電阻色環計算阻值與誤差。"""
+
+from collections.abc import Sequence
+
+
+DIGIT_COLORS = {
+    "黑": 0,
+    "棕": 1,
+    "紅": 2,
+    "橙": 3,
+    "黃": 4,
+    "綠": 5,
+    "藍": 6,
+    "紫": 7,
+    "灰": 8,
+    "白": 9,
+}
+
+ENGLISH_COLORS = {
+    "black": "黑",
+    "brown": "棕",
+    "red": "紅",
+    "orange": "橙",
+    "yellow": "黃",
+    "green": "綠",
+    "blue": "藍",
+    "violet": "紫",
+    "purple": "紫",
+    "gray": "灰",
+    "grey": "灰",
+    "white": "白",
+    "gold": "金",
+    "silver": "銀",
+}
+
+MULTIPLIERS = {color: 10**digit for color, digit in DIGIT_COLORS.items()}
+MULTIPLIERS.update({"金": 0.1, "銀": 0.01})
+
+TOLERANCES = {
+    "棕": 1,
+    "紅": 2,
+    "綠": 0.5,
+    "藍": 0.25,
+    "紫": 0.1,
+    "灰": 0.05,
+    "金": 5,
+    "銀": 10,
+}
+
+NUMBERED_COLORS = {str(value): color for color, value in DIGIT_COLORS.items()}
+NUMBERED_COLORS.update({"10": "金", "11": "銀"})
+
+
+def normalize_color(color: str) -> str:
+    """將英文色名轉成標準中文色名，並忽略大小寫及首尾空白。"""
+    value = color.strip().lower()
+    return ENGLISH_COLORS.get(value, value)
+
+
+def parse_color_codes(entry: str) -> list[str]:
+    """將使用者輸入的數字色碼轉換成色名。"""
+    codes = entry.replace(",", " ").split()
+    try:
+        return [NUMBERED_COLORS[code] for code in codes]
+    except KeyError as error:
+        raise ValueError("色碼只能輸入 0 到 11。") from error
+
+
+def calculate_resistance(colors: Sequence[str]) -> tuple[float, float]:
+    """回傳電阻值（Ω）及誤差百分比；接受 4 環或 5 環色碼。"""
+    normalized = [normalize_color(color) for color in colors]
+    if len(normalized) not in (4, 5):
+        raise ValueError("請輸入 4 個或 5 個色環。")
+
+    digit_count = len(normalized) - 2
+    digits = normalized[:digit_count]
+    multiplier_color = normalized[digit_count]
+    tolerance_color = normalized[digit_count + 1]
+
+    if any(color not in DIGIT_COLORS for color in digits):
+        raise ValueError("數字色環只能使用黑、棕、紅、橙、黃、綠、藍、紫、灰、白。")
+    if len(digits) > 1 and digits[0] == "黑":
+        raise ValueError("第一個有效數字色環不能是黑色。")
+    if multiplier_color not in MULTIPLIERS:
+        raise ValueError("倍率色環只能使用黑到白、金或銀。")
+    if tolerance_color not in TOLERANCES:
+        raise ValueError("誤差色環只能使用棕、紅、綠、藍、紫、灰、金或銀。")
+
+    significant_digits = int("".join(str(DIGIT_COLORS[color]) for color in digits))
+    resistance = significant_digits * MULTIPLIERS[multiplier_color]
+    return resistance, TOLERANCES[tolerance_color]
+
+
+def format_resistance(resistance: float) -> str:
+    """以適合閱讀的 Ω、kΩ 或 MΩ 顯示阻值。"""
+    if resistance >= 1_000_000:
+        return f"{resistance / 1_000_000:g} MΩ"
+    if resistance >= 1_000:
+        return f"{resistance / 1_000:g} kΩ"
+    return f"{resistance:g} Ω"
+
+
+def main() -> None:
+    print("電阻色碼計算器（支援 4 環與 5 環）")
+    print("數字對應：0黑 1棕 2紅 3橙 4黃 5綠 6藍 7紫 8灰 9白 10金 11銀")
+    print("依色環順序輸入 4 個或 5 個數字，以空格或逗號分隔，例如：4 7 2 10")
+    print("輸入 q 結束。")
+
+    while True:
+        entry = input("\n色環顏色：").strip()
+        if entry.lower() in {"q", "quit", "exit"}:
+            print("計算結束。")
+            return
+
+        try:
+            colors = parse_color_codes(entry)
+            resistance, tolerance = calculate_resistance(colors)
+        except ValueError as error:
+            print(f"輸入錯誤：{error}")
+            continue
+
+        print(f"電阻值：{format_resistance(resistance)} ±{tolerance:g}%")
+
+
+if __name__ == "__main__":
+    main()
